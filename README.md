@@ -6,7 +6,7 @@ in which config.txt is a YAML file with the entries:
 
 
 ```
-customer_id: <ZPA tenant ID>
+vanity_domain: "<vanity domain.zslogin.net>"
 client_id: "<ZPA API client ID>"
 client_secret: "<ZPA API client secret>"
 target: <target Microtenant name>
