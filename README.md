@@ -12,5 +12,5 @@ client_secret: "<ZPA API client secret>"
 target: <target Microtenant name>
 skiplist:
 - "Default"
-- <other tenants to not include in source Access Policy sync to target>
+- <other tenants to not include in source Policy Group sync to target>
 ```
