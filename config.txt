@@ -2,6 +2,12 @@
 vanity_domain: demotenant
 client_id: "ohR5NNm2OEDyNjV4sMd2OkdzQQZmNOAkWkS2MtkjasdfkjDksSDFWWZiLDSFYmJjMzEwNjEDSF=="
 client_secret: "ExD2a5n99!%rxU@lSaXswB%RFSDFD57:"
+
 target: "MSP"
 skiplist:
  - "Default"
+
+# Specifies dry-run/read-only mode.
+# Set to "true" to safely evaluate and log expected changes
+# without mutating the target Microtenant configurations.
+readonly: true
