@@ -170,7 +170,7 @@ class OneAPI:
 		"negated",
 	}
 
-	def __init__(self, vanity_domain=None, client_id=None, client_secret=None, log=None, ssl_verify=False):
+	def __init__(self, vanity_domain=None, client_id=None, client_secret=None, log=None, ssl_verify=False, readonly=False):
 		if log is None:
 			raise Exception("Logging subsystem failure")
 		self.log = log
@@ -194,6 +194,7 @@ class OneAPI:
 		self.scim_base_url = "/zpa/userconfig/v1"
 		self.session = None
 		self.ssl_verify = ssl_verify
+		self.readonly = readonly
 
 		self.oneapi_zpa_customer_id = None
 		self.oneapi_zpa_customer_name = None
@@ -272,13 +273,32 @@ class OneAPI:
 		if self.session is None:
 			self.authenticate()
 
+		act = action.lower()
+		# If readonly is enabled, intercept POST, PUT, DELETE write calls.
+		if self.readonly and act in ("post", "put", "delete"):
+			self.log.info(f"[{self.class_name}] [READONLY MODE] Intercepted and skipped {action.upper()} on {path}")
+			# Return a mock response or dictionary representing success/empty state
+			if act == "delete":
+				class MockResponse:
+					status_code = 204
+					text = ""
+					def json(self): return {}
+				return MockResponse()
+			# For POST/PUT, we return a dictionary that acts like a mock created entity
+			# so that subsequent code gets a valid dictionary with mock details
+			mock_id = "mock_id_readonly"
+			mock_name = "mock_readonly_entity"
+			if isinstance(data, dict):
+				mock_id = data.get("id", "mock_id_readonly")
+				mock_name = data.get("name", "mock_readonly_entity")
+			return {"id": mock_id, "name": mock_name}
+
 		headers = (self.headers | addl_headers) if addl_headers is not None else self.headers
 
 		try:
 			url = self.get_oneapi_url(service) + path
 			requests.packages.urllib3.disable_warnings()
 
-			act = action.lower()
 			if act == "get":
 				response = self.session.get(url, headers=headers, verify=self.ssl_verify)
 			elif act == "delete":
@@ -671,7 +691,7 @@ class OneAPI:
 
 		if self._uses_values_format(obj_type, operand):
 			vals = []
-			for list_key in ("values", "rhsValues", "ids", "appSegmentIds", "applicationIds"):
+			for list_key in ("values", "rhsValues", "ids", "appSegmentIds", "applicationIds", "appIds"):
 				raw_list = operand.get(list_key)
 				if isinstance(raw_list, list) and len(raw_list) > 0:
 					for v in raw_list:
@@ -888,6 +908,7 @@ class OneAPI:
 				"policyGroupSetGid",
 				"policyGroupId",
 				"policyGroupGid",
+				"groupSetId",
 				"groupId",
 				"ruleId",
 				"microtenantId",
@@ -1984,6 +2005,9 @@ def get_parameters_from_config(filename, keys):
 	error = False
 	for tenant_key in keys:
 		if tenant_key not in config_file:
+			# Optional keys such as readonly should not trigger an error
+			if tenant_key == "readonly":
+				continue
 			print(f"[PolicyGroupSync] Key '{tenant_key}' missing in configuration file '{filename}'.")
 			error = True
 
@@ -1995,19 +2019,27 @@ def get_parameters():
 	parser.add_argument("--config", required=False)
 	parser.add_argument("--ssl_verify", default=False, required=False)
 	parser.add_argument("--log_level", default="DEBUG", required=False)
+	parser.add_argument("--readonly", action="store_true", default=False, help="Readonly / dry-run mode")
 	args = parser.parse_args()
 
 	parameters = {
 		"ssl_verify": args.ssl_verify,
 		"log_level": args.log_level,
+		"readonly": args.readonly,
 	}
 
-	keys = ["vanity_domain", "client_id", "client_secret", "target", "skiplist"]
+	keys = ["vanity_domain", "client_id", "client_secret", "target", "skiplist", "readonly"]
 	if args.config:
 		config_file_parameters = get_parameters_from_config(args.config, keys) or {}
 		for key in keys:
 			if key in config_file_parameters:
 				parameters[key] = config_file_parameters[key]
+
+	if "readonly" not in parameters:
+		parameters["readonly"] = False
+
+	if isinstance(parameters["readonly"], str):
+		parameters["readonly"] = parameters["readonly"].lower() in ("true", "1", "yes")
 
 	return parameters
 
@@ -2433,7 +2465,11 @@ def sync():
 		client_secret=parameters["client_secret"],
 		log=log,
 		ssl_verify=parameters["ssl_verify"],
+		readonly=parameters.get("readonly", False),
 	)
+	if parameters.get("readonly", False):
+		log.info("[Policy Group Sync] Running in READ-ONLY/DRY-RUN mode. No changes will be made to the target Microtenant.")
+
 	tenant.authenticate()
 
 	# Step 2: Discover Microtenants & resolve Target / Skiplist
