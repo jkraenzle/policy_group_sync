@@ -1,11 +1,12 @@
-# YAML example with fake credentials
-vanity_domain: demotenant
-client_id: "ohR5NNm2OEDyNjV4sMd2OkdzQQZmNOAkWkS2MtkjasdfkjDksSDFWWZiLDSFYmJjMzEwNjEDSF=="
-client_secret: "ExD2a5n99!%rxU@lSaXswB%RFSDFD57:"
+# config.yaml
+vanity_domain: "your-vanity-domain"
+client_id: "your-oneapi-client-id"
+client_secret: "your-oneapi-client-secret"
+target: "target-microtenant-name"
 
-target: "MSP"
+# Optional list of microtenants to bypass during synchronization
 skiplist:
- - "Default"
+  - "BypassedOpCo"
 
 # Specifies dry-run/read-only mode.
 # Set to "true" to safely evaluate and log expected changes
